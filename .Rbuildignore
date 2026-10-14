@@ -1,4 +1,13 @@
-carl.R
+^carl\.R$
+^checkFuns\.R$
+^getMIMETypes\.R$
+^getPage\.xml$
+^Todo\.xml$
+^methods$
+^test_rwordpress\.png$
+^Web$
 .*autom4te.cache.*
 config.log
 config.status
+^.*\.Rproj$
+^\.Rproj\.user$

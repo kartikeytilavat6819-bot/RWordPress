@@ -45,7 +45,8 @@ getRecentPostTitles(num = 100, blogid = 0L, login = getOption("WordpressLogin", 
    named character vector of the form \code{c(login = "password")}.}
  \item{blogid}{the identifier for the particular blog. Often this can be
    left as 0 to identify the default blog.}
- \item{...}{additional parameters passed to \code{xml.rpc}}
+ \item{...}{additional parameters passed to the XML-RPC client,
+   e.g. \code{.opts = list(verbose = TRUE)}. See \code{\link{newPost}}.}
  \item{asDataFrame}{whether to conver the result into a data frame}
  \item{pageid,postid,post}{the id of the page or post of interest}
  \item{num}{the number of posts/titles to retrieve}
@@ -55,8 +56,22 @@ getRecentPostTitles(num = 100, blogid = 0L, login = getOption("WordpressLogin", 
     option in R named \code{WordpressURL}, e.g.
        \code{options(WordpressURL = "https://www.mywordpress.org/xmlrpc.php")}.}
  } 
- \value{}
- \examples{}
+ \value{
+   \code{getCategories} returns a named vector of category identifiers.
+   \code{getPosts}, \code{getPages}, \code{getPageList} and
+   \code{generalRequest} (by default) return a data frame;
+   other functions return the server's response converted to R
+   (structs become named lists, arrays become vectors or lists).
+ }
+ \examples{
+\dontrun{
+ options(WordpressLogin = c(myname = "my-application-password"),
+         WordpressURL = "https://myblog.example.com/xmlrpc.php")
+ getUsersBlogs()
+ getCategories()
+ getPosts(num = 10)
+}
+ }
  \keyword{IO}
  \concept{blogging}
  

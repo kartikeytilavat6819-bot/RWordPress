@@ -25,7 +25,9 @@ supportedTextFilters(.server = getServerURL())
 }
 \author{Duncan Temple Lang}
 \examples{
-
+\dontrun{
+supportedMethods("https://wordpress.org/xmlrpc.php")
+}
 }
 \keyword{IO}
 \keyword{programming}

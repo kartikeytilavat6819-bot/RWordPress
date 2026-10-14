@@ -1,3 +1,45 @@
+Version 0.3-0
+
+  *   Works with current R (tested on R 4.6.1). The package now has its own
+      XML-RPC client built on curl and xml2 and no longer needs the XMLRPC
+      package (never on CRAN), RCurl or XML. Everything installs from CRAN.
+
+  *   Calls are now valid XML-RPC: structs and arrays are wrapped in <value>,
+      times keep their minutes (XMLRPC wrote %H:%H:%S), doubles are written
+      without exponents, factors are sent as strings, and NA/Inf raise an error
+      instead of being sent as text.
+
+  *   Responses: empty arrays no longer error, <nil/>, <i8> and dates with
+      dashes or time zones are handled, and a BOM/whitespace before the XML
+      declaration is tolerated. HTTP errors (e.g. XML-RPC disabled by the
+      host) report the status and message instead of "Problems".
+
+  *   guessMIMEType() is vectorized (it failed in R >= 4.2), works without
+      attaching the package, and falls back to application/octet-stream.
+
+  *   newPost()/editPost()/newPage(): a single category is sent as an array
+      (WordPress ignored it otherwise, e.g. from knitr::knit2wp()),
+      mt_keywords may be a character vector, and multi-element descriptions
+      are collapsed into one string.
+
+  *   newCategory() sends the struct WordPress expects; it previously created
+      a category named after the first letter only.
+
+  *   getPostStatusList() called wp.getPageStatusList.
+
+  *   setPostCategories() sends an array (not a struct) of categories, accepts
+      numeric ids, and deleteCategory()/matchCategory() return ids rather than
+      names for fuzzy matches.
+
+  *   uploadFile() supports in-memory content via I() or raw vectors.
+
+  *   getPosts()/getPages() handle empty results and fields missing from some
+      posts.
+
+  *   appendToPost() works and is exported, as is guessMIMEType().
+
+  *   Added a test suite, including a fake WordPress XML-RPC server.
+
 Version 0.2-3
 
   *   Another fix for editPost() found by Daniel Wollschlaeger.

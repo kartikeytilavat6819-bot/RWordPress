@@ -6,7 +6,7 @@
   This is a programmatically generated character vector
   whose names identify the  MIME type typically associated with
   the extension which are the values.
-  This is used in \code{\link[RCurl]{guessMIMEType}}.
+  This is used in \code{\link{guessMIMEType}}.
   We can match an extension and then find the corresponding
   MIME type.
   There are duplicates.

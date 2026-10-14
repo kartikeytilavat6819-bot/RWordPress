@@ -8,13 +8,14 @@ This is a package that provides a programmatic interface to
 access Wordpress blogs using XMLRPC.
 }
 \details{
-\tabular{ll}{
-Package: \tab RWordPress\cr
-Version: \tab 0.1-0\cr
-License: \tab BSD\cr
-Imports: \tab XMLRPC\cr
-Built: \tab R 2.11.0; ; 2010-03-13 23:08:36 UTC; unix\cr
-}
+The package contains its own XML-RPC client (built on the \pkg{curl} and
+\pkg{xml2} packages), so it does not need the \pkg{XMLRPC}, \pkg{RCurl}
+or \pkg{XML} packages.
+
+WordPress sites with two-factor authentication, and WordPress.com, need an
+\emph{application password} (created under Users > Profile in the WordPress
+dashboard) rather than your normal password. Some hosts and security plugins
+disable XML-RPC entirely; then every call fails with an HTTP 403 or 405 error.
 
 Most of the  functions in the package are direct
 R implementations of the corresponding methods described
@@ -62,7 +63,7 @@ the parameters expected and the return type.
 \item{getPages}{wp.getPages  \url{http://codex.wordpress.org/XML-RPC_wp#wp.getPages}}
 \item{getPost}{metaWeblog.getPost  \url{http://www.sixapart.com/developers/xmlrpc/movable_type_api/metawebloggetpost.html}}
 \item{getPostCategories}{mt.getPostCategories  \url{http://www.sixapart.com/developers/xmlrpc/movable_type_api/mtgetpostcategories.html}}
-\item{getPostStatusList}{wp.getPageStatusList  \url{http://codex.wordpress.org/XML-RPC_wp#wp.getPageStatusList}}
+\item{getPostStatusList}{wp.getPostStatusList  \url{http://codex.wordpress.org/XML-RPC_wp#wp.getPostStatusList}}
 \item{getRecentPostTitles}{mt.getRecentPostTitles  \url{http://www.sixapart.com/developers/xmlrpc/movable_type_api/mtgetrecentposttitles.html}}
 \item{getTags}{wp.getTags  \url{http://codex.wordpress.org/XML-RPC_wp#wp.getTags}}
 \item{getUsersBlogs}{wp.getUsersBlogs  \url{http://codex.wordpress.org/XML-RPC_wp#wp.getUsersBlogs}}
@@ -80,12 +81,7 @@ Duncan Temple Lang
 
 Maintainer: Duncan Temple Lang <duncan@r-project.org>
 }
-\references{
-}
 \keyword{ package }
 \seealso{
-\code{XMLRPC} package
-}
-\examples{
-
+\url{https://developer.wordpress.org/apis/xml-rpc/}
 }

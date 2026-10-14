@@ -22,7 +22,7 @@ function(num = 100, blogid = 0L, login = getOption("WordpressLogin", stop("need 
 {
   ans = xml.rpc(.server, "mt.getRecentPostTitles", as.integer(blogid),
                      names(login), as.character(login), as.integer(num), ...)
-  do.call("rbind", lapply(ans, as.data.frame))
+  makeIntoDataFrame(ans)
 }
 
 getTags =
@@ -50,7 +50,7 @@ getPage =
   # ll = getPages()
 function(pageid, blogid = 0L, login = getOption("WordpressLogin", stop("need a login and password")), ..., .server = getServerURL())
 {
-  #XXX conversion is not right. 
+  #XXX conversion is not right.
    xml.rpc(.server, "wp.getPage", blogid, pageid, names(login), as.character(login), ...)
 }
 
@@ -87,7 +87,7 @@ getPostStatusList =
  # ll = getOptions()
 function(blogid = 0L, login = getOption("WordpressLogin", stop("need a login and password")), ..., .server = getServerURL())
 {
- generalRequest("wp.getPageStatusList", blogid, login, ..., asDataFrame = FALSE, .server = .server)
+ generalRequest("wp.getPostStatusList", blogid, login, ..., asDataFrame = FALSE, .server = .server)
 }
 
 generalRequest =
@@ -103,20 +103,29 @@ function(op, blogid = 0L, login = getOption("WordpressLogin", stop("need a login
 
 
 makeIntoDataFrame =
-   # XXX have to make certain that we have the same variables.  
+   # XXX have to make certain that we have the same variables.
 function(els)
 {
+  if(length(els) == 0)
+    return(data.frame())
+  if(length(names(els)) && all(names(els) != ""))  # a single struct rather than an array of them
+    els = list(els)
+
     # handle scalar variables and non-scalar variables separately.
+    # A variable that is missing/empty in some elements is still scalar.
   vars = unique(unlist(lapply(els, names)))
-  isScalar = sapply(vars, function(v) all(sapply(els, function(x) length(x[[v]])) == 1))
+  isScalar = vapply(vars, function(v) all(vapply(els, function(x) length(x[[v]]) <= 1 && is.atomic(x[[v]]), logical(1))),
+                    logical(1))
   scalarVars = vars[ isScalar ]
 
   tmp = lapply(els, function(x) {
-                       vals = x[scalarVars]
-                       vals[sapply(vals, length) == 0] = NA
-                       as.data.frame(vals)
+                       vals = structure(lapply(scalarVars, function(v) if(length(x[[v]])) x[[v]] else NA),
+                                        names = scalarVars)
+                       as.data.frame(vals, stringsAsFactors = FALSE, check.names = FALSE)
                      })
   ans = do.call("rbind", tmp)
+  if(is.null(ans))
+    ans = data.frame(row.names = seq_along(els))
 
       # now go and grab the non-scalar values across the different elements
   if(any(!isScalar)) {
@@ -139,8 +148,8 @@ function(category, description = "???", slug = category, parent = 0L, blogid = 0
           login = getOption("WordpressLogin", stop("need a login and password")),
            .server = getServerURL())
 {
-#  catg = list(category, slug, parent, description)
-  catg = category
+  catg = list(name = as.character(category), slug = as.character(slug),
+              parent_id = as.integer(parent), description = as.character(description))
   ans = xml.rpc(.server, "wp.newCategory",
                    as.integer(blogid), names(login), as.character(login), catg)
   structure(ans, names = category, class = "WordPressCategoryId")
@@ -164,9 +173,8 @@ newPage =
 function(content, publish = TRUE, blogid = 0, login = getOption("WordpressLogin", stop("need a login and password")),
           method = "wp.newPage", .server = getServerURL())
 {
-  if(is.character(content))
-    content = list(description = content)
-  
+  content = postContent(content)
+
   ans = xml.rpc(.server, method,
                     as.character(blogid), names(login), as.character(login), content, as.logical(publish))
   ans
@@ -198,7 +206,15 @@ function(postid, categories, login = getOption("WordpressLogin", stop("need a lo
            publish = TRUE, ..., .server = getServerURL())
 {
    cats = matchCategory(categories, login, .server = .server)
-   values = lapply(cats, function(x) list(categoryId = x))
+   values = lapply(unname(cats), function(x) list(categoryId = as.character(x)))
+   setPostCategories(postid, values, login, publish, ..., .server = .server)
+})
+
+setMethod("setPostCategories", c(categories = "numeric"),
+function(postid, categories, login = getOption("WordpressLogin", stop("need a login and password")),
+           publish = TRUE, ..., .server = getServerURL())
+{
+   values = lapply(as.character(categories), function(x) list(categoryId = x))
    setPostCategories(postid, values, login, publish, ..., .server = .server)
 })
 
@@ -207,14 +223,14 @@ function(postid, categories, login = getOption("WordpressLogin", stop("need a lo
 {
   ans = xml.rpc(.server, "mt.setPostCategories", as.character(postid),
                        names(login), as.character(login), categories, ...)
-  if(ans && publish)
+  if(isTRUE(ans) && publish)
      publishPost(postid, login, .server = .server)
   else
      ans
 })
 
 publishPost =
- # 
+ #
 function(postid, login = getOption("WordpressLogin", stop("need a login and password")), ..., .server = getServerURL())
 {
   xml.rpc(.server, "mt.publishPost", as.character(postid),
@@ -235,25 +251,31 @@ uploadFile =
   #
   # uploadFile("RWordpress/R/wp.R")
   #
-function(what, type = guessMIMEType(what), blogid = 0L, login = getOption("WordpressLogin", stop("need a login and password")),
+function(what, type = guessMIMEType(remoteName), blogid = 0L, login = getOption("WordpressLogin", stop("need a login and password")),
           remoteName = basename(what), overwrite = TRUE, ..., .server = getServerURL())
 {
-  if(inherits(what, "AsIs")) {
-    content = what     
+  if(inherits(what, "AsIs") || is.raw(what)) {
+    if(missing(remoteName))
+      stop("remoteName must be given when uploading content rather than a file")
+    x = unclass(what)
+    content = if(is.raw(x)) x
+              else if(is.character(x)) charToRaw(enc2utf8(paste(x, collapse = "\n")))
+              else serialize(x, NULL)
   } else {
     if(!file.exists(what))
       stop("no such file ", what)
     content = readBinaryFile(what)
   }
 
-  info = list(name = remoteName, type = type, bits = content, overwrite = overwrite)
+  info = list(name = remoteName, type = unname(as.character(type)), bits = content,
+              overwrite = as.logical(overwrite))
   xml.rpc(.server, "wp.uploadFile", as.character(blogid),
-                     names(login), as.character(login),  info, ...)  
+                     names(login), as.character(login),  info, ...)
 
 }
 
-readBinaryFile = 
-function (filename) 
+readBinaryFile =
+function (filename)
 {
     con = file(filename, "rb")
     on.exit(close(con))
@@ -278,7 +300,7 @@ function(categoryid, blogid = 0L, login = getOption("WordpressLogin", stop("need
 {
   if(!inherits(categoryid, "WordPressCategoryId"))
      categoryid = matchCategory(categoryid, login, .server = .server)
-  
+
   xml.rpc(.server, "wp.deleteCategory", as.character(blogid),
                      names(login), as.character(login), as.character(categoryid), ...)
 }
@@ -287,24 +309,23 @@ matchCategory =
 function(categories, login, catIds = getCategoryList(login, .server = .server), .server = getServerURL())
 {
 
-   i = pmatch(tolower(categories), tolower(names(catIds)))
-   cats = catIds[ i[!is.na(i)] ]
+   i = pmatch(tolower(categories), tolower(names(catIds)), duplicates.ok = TRUE)
    if(any(is.na(i))) {
-     i = which(is.na(i))
-     j = lapply(tolower(categories[i]), function(x) {
-                                          tmp = agrep(x, tolower(names(cats)), value = TRUE)
+     miss = which(is.na(i))
+     j = lapply(tolower(categories[miss]), function(x) {
+                                          tmp = agrep(x, tolower(names(catIds)))
                                           if(length(tmp) > 1)
-                                            warning(x, " matches ", paste(tmp, collapse = ", "))
+                                            warning(x, " matches ", paste(names(catIds)[tmp], collapse = ", "))
                                           tmp
                                         })
-     if(any(sapply(j, length) != 1))
+     if(any(lengths(j) != 1))
           # should create them possibly, but only after looking at agrep to see possible matches.
-       stop("don't recognize category ", paste(categories[i], collapse = ", "))
+       stop("don't recognize category ", paste(categories[miss][lengths(j) != 1], collapse = ", "))
 
-     cats[i] = unlist(j)
+     i[miss] = unlist(j)
    }
 
-   cats
+   catIds[i]
 
 }
 
@@ -313,7 +334,7 @@ deletePage =
   #
   #  pages = getPages()
   #  page = wp.newPage(list(description = "This is some text that I posted from R", title = "Test from R"))
-  #  tmp = getPages()  
+  #  tmp = getPages()
   #  deletePage(getUsersBlogs()[[1]]$blogid, page)
   #  newPages = getPages()
   #  nrow(pages) == nrow(newPages)
@@ -328,9 +349,8 @@ function(pageid, blogid = 0L, login = getOption("WordpressLogin", stop("need a l
 editPost =
 function(postid, content, login = getOption("WordpressLogin", stop("need a login and password")), publish = TRUE, appId = "RWordpress", ..., .server = getServerURL())
 {
-  if(!is.list(content))
-    content = list(description = as.character(content))
-  
+  content = postContent(content)
+
   xml.rpc(.server, "metaWeblog.editPost", as.character(postid),
                      names(login), as.character(login), content, as.logical(publish), ...)
 }
@@ -340,13 +360,34 @@ function(postid, content, login = getOption("WordpressLogin", stop("need a login
 # http://www.sixapart.com/developers/xmlrpc/movable_type_api/
 
 supportedMethods =
-function(.server = getServerURL())  
+function(.server = getServerURL())
    xml.rpc(.server, "mt.supportedMethods")
 
 supportedTextFilters =
-function(.server = getServerURL())  
-   xml.rpc(.server, "mt.supportedTextFilters")  
+function(.server = getServerURL())
+   xml.rpc(.server, "mt.supportedTextFilters")
 
 
 
 ##################
+
+
+postContent =
+  # Normalize the content struct for metaWeblog.newPost/editPost and wp.newPage.
+  # WordPress silently ignores 'categories' unless it is an array, so a single
+  # category given as a string (e.g. via knitr::knit2wp) was previously dropped.
+function(content)
+{
+  if(!is.list(content))
+    content = list(description = content)
+
+  for(id in intersect(c("description", "title", "mt_excerpt", "mt_text_more"), names(content)))
+    content[[id]] = paste(as.character(content[[id]]), collapse = "\n")
+
+  if("categories" %in% names(content))
+    content$categories = I(as.character(unlist(content$categories)))
+  if("mt_keywords" %in% names(content))
+    content$mt_keywords = paste(as.character(unlist(content$mt_keywords)), collapse = ",")
+
+  content
+}
